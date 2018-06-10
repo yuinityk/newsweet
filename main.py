@@ -1,3 +1,4 @@
+#!/usr/bin/python3
 # coding: utf-8
 
 import time
@@ -23,7 +24,7 @@ AS = ''
 webhook_url = ''
 
 def parse_date(date):
-    mtom = {'Jan':1,'Feb':2,'Mar':3,'Apr':4,'May':5,'Jun':6,'Jul':7,'Aug':8,'Sep':9,'Oct':10,'Nov':11,'Dec':12}
+    mtom = {'Jan':'01','Feb':'02','Mar':'03','Apr':'04','May':'05','Jun':'06','Jul':'07','Aug':'08','Sep':'09','Oct':'10','Nov':'11','Dec':'12'}
     month = mtom[date[4:7]]
     dd = date[8:10]
     hh = date[11:13]
@@ -44,28 +45,55 @@ def cond_text(text):
     else:
         return False
 
-twitter = OAuth1Session(CK,CS,AT,AS)
-slack = slackweb.Slack(url=webhook_url)
-url_get = "https://api.twitter.com/1.1/statuses/user_timeline.json"
+def write_date(date):
+    with open("date.txt","w") as f:
+        f.write(date[0]+date[1]+date[2]+date[3]+date[4]+date[5])
 
-params_id = {'screen_name': 'hoge'}
-params_get = {'screen_name':'bue','count':100}
-req = twitter.get(url_get,params=params_get)
+def read_date():
+    date = []
+    with open("date.txt","r") as f:
+        t = f.read()
+        date.append(t[:4])
+        date.append(t[4:6])
+        date.append(t[6:8])
+        date.append(t[8:10])
+        date.append(t[10:12])
+        date.append(t[12:14])
+    return date
 
-recentDate = ['2018',5,'30','10','00','00']
-while True:
-    if req.status_code == 200:
-        search_timeline = json.loads(req.text)
-        for tw in search_timeline[::-1]:
-            if cond_text(tw['text']):
-                if cmp_date(parse_date(tw['created_at']),recentDate):
-                    img_urls = []
-                    for i in range(len(tw['extended_entities']['media'])):
-                        img_urls.append(tw['extended_entities']['media'][i]['media_url'])
-                    slack.notify(text=tw['text'])
-                    for i in range(len(img_urls)):
-                        slack.notify(text=img_urls[i])
-                    recentDate = parse_date(tw['created_at'])
-    else:
-        print("ERROR: %d" % req.status_code)
-    time.sleep(60)
+def main():
+    twitter = OAuth1Session(CK,CS,AT,AS)
+    slack = slackweb.Slack(url=webhook_url)
+    url_get = "https://api.twitter.com/1.1/statuses/user_timeline.json"
+
+    params_id = {'screen_name': 'hoge'}
+    params_get = {'screen_name':'hoge','count':100}
+
+
+    recentDate = read_date()
+    while True:
+        req = twitter.get(url_get,params=params_get)
+        if req.status_code == 200:
+            search_timeline = json.loads(req.text)
+            for tw in search_timeline[::-1]:
+                if cond_text(tw['text']):
+                    if cmp_date(parse_date(tw['created_at']),recentDate):
+
+                        slack.notify(text=tw['text'])
+
+                        if 'extended_entities' in tw.keys():
+                            img_urls = []
+                            for i in range(len(tw['extended_entities']['media'])):
+                                img_urls.append(tw['extended_entities']['media'][i]['media_url'])
+                            for i in range(len(img_urls)):
+                                slack.notify(text=img_urls[i])
+
+                        recentDate = parse_date(tw['created_at'])
+                        write_date(recentDate)
+        else:
+            print("ERROR: %d" % req.status_code)
+        time.sleep(60)
+
+
+if __name__ == '__main__':
+    main()
